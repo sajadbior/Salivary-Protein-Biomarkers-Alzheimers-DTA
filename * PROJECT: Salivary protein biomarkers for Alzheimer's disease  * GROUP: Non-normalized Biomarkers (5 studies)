@@ -1,0 +1,60 @@
+* ==============================================================================
+* PROJECT: Salivary protein biomarkers for Alzheimer's disease 
+* GROUP: Non-normalized Biomarkers (5 studies)
+* ==============================================================================
+
+clear all
+set more off
+
+* ------------------------------------------------------------------------------
+* STEP 1: DATA UPLOAD & PREPARATION
+* ------------------------------------------------------------------------------
+* Data entered exactly as per Supplementary File 8.xlsx
+
+input str20 study int year int tp int fp int fn int tn str30 diagnostic_criteria str20 saliva_type str20 method int fasting float mean_age_case float mean_age_control
+"Gonzalez"   2020  23  1   2   47   "NIA-AA"       "Unstimulated" "ELISA" 0 67.2  66.9
+"Antequera_LOAD" 2024 21 4   4   41   "NIA-AA"       "Unstimulated" "ELISA" 0 77.80 75.93
+"Antequera_EOAD" 2024 18 16  10  43   "NIA-AA"       "Unstimulated" "ELISA" 0 58.85 58.64
+"D'Antonio"  2025  19  4   1   16   "NIA-AA"       "Unstimulated" "ELISA" 0 76.8  72.1
+"Antequera2026" 2026 23 4   1   25   "NIA-AA"       "Unstimulated" "ELISA" 1 75.37 68.46
+end
+
+* ------------------------------------------------------------------------------
+* STEP 2: MAIN META-ANALYSIS (Results Section)
+* ------------------------------------------------------------------------------
+* Using metadta for pooled Sens, Spec, and DOR
+* This yields Sens = 0.88 (0.75-0.95), Spec = 0.88 (0.79-0.94), DOR = 52.36
+metadta tp fp fn tn, studyid(study) label(namevar=study, yearvar=year) sumtable(all)
+
+* Using midas mle for I-squared, tau-squared, and HSROC parameters
+midas mle tp fp fn tn, id(study) res(all)
+
+* Plot Forest Plot (Figure 5)
+metadta tp fp fn tn, studyid(study) label(namevar=study, yearvar=year) sumtable(all) forestplot
+
+* Plot HSROC Curve (Figure S20)
+midasplot
+
+* ------------------------------------------------------------------------------
+* STEP 3: SENSITIVITY ANALYSIS (Table 2 & Figures S21-S22)
+* ------------------------------------------------------------------------------
+* Excluding Antequera_EOAD (Early-Onset AD cohort) due to age heterogeneity
+metadta tp fp fn tn if study != "Antequera_EOAD", studyid(study) sumtable(all)
+
+* For the remaining 4 studies, the model yields Sens = 0.92 (0.84-0.96) and Spec = 0.91 (0.82-0.95)
+* Plot Forest Plot for Sensitivity Analysis (Figure S21)
+metadta tp fp fn tn if study != "Antequera_EOAD", studyid(study) label(namevar=study, yearvar=year) sumtable(all) forestplot
+
+* Plot HSROC Curve for Sensitivity Analysis (Figure S22)
+midas mle tp fp fn tn if study != "Antequera_EOAD", id(study) res(all)
+midasplot
+
+* ------------------------------------------------------------------------------
+* STEP 4: CALCULATING AUC
+* ------------------------------------------------------------------------------
+* To obtain AUC = 0.91 as reported in the manuscript for non-normalized group:
+midas jsroc, scurve cregion pregion data mean Ignd area
+
+* ==============================================================================
+* END OF SCRIPT
+* ==============================================================================
