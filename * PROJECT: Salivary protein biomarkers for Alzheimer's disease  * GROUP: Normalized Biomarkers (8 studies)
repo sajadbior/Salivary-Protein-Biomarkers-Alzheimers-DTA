@@ -1,0 +1,100 @@
+* ==============================================================================
+* PROJECT: Salivary protein biomarkers for Alzheimer's disease 
+* GROUP: Normalized Biomarkers (8 studies)
+* ==============================================================================
+
+clear all
+set more off
+
+* ------------------------------------------------------------------------------
+* STEP 1: DATA UPLOAD & PREPARATION
+* ------------------------------------------------------------------------------
+* Data entered exactly as per Supplementary File 6.xlsx
+
+input str20 study int year int tp int fp int fn int tn str30 diagnostic_criteria str20 saliva_type str20 method int fasting float mean_age_case float mean_age_control
+"Sayer"      2004  12  2   2   9   "NINCDS-ADRDA" "Unstimulated" "Colorimetric" 0 75.0  71.0
+"Gleerup"    2021  40  6  31  14   "NIA-AA"       "Unstimulated" "ELISA"        1 72.1  65.7
+"Katsipis"   2021  15  0   5  20   "NIA-AA"       "Unstimulated" "ELISA"        0 75.0  79.0
+"Zalewska"   2021  22  4   3  21   "NINCDS-ADRDA" "Stimulated"   "ELISA"        1 81.19 82.2
+"Eldem"      2022  15  9   2  10   "Swiss"        "Unstimulated" "Western blot" 1 72.0  64.0
+"McNicholas" 2022  10  4   6  25   "NIA-AA"       "Unstimulated" "ELISA"        1 79.0  74.0
+"Sabaei"     2023  15  2   9  20   "NIA-AA"       "Unstimulated" "ELISA"        1 73.5  64.1
+"Bamford"    2026  40  6  19  15   "Skillback"    "Unstimulated" "MSD"          1 77.6  70.36
+end
+
+* Create Covariates for Meta-regression
+gen niaa = (diagnostic_criteria == "NIA-AA")
+gen ad_core = (study == "Zalewska" | study == "Sabaei" | study == "Bamford")
+gen immune = (study == "Gleerup" | study == "Katsipis")
+
+* ------------------------------------------------------------------------------
+* STEP 2: MAIN META-ANALYSIS (Results Section)
+* ------------------------------------------------------------------------------
+* Using metadta for pooled Sens, Spec, LR+, LR-, and DOR (DOR = 11.82)
+metadta tp fp fn tn, studyid(study) label(namevar=study, yearvar=year) sumtable(all)
+
+* Using midas mle for I-squared, tau-squared, and HSROC parameters
+midas mle tp fp fn tn, id(study) res(all)
+
+* Plot HSROC Curve (Figure 4)
+midasplot
+
+* ------------------------------------------------------------------------------
+* STEP 3: SENSITIVITY ANALYSES (Table 2 & Figures S1-S6)
+* ------------------------------------------------------------------------------
+* 1. Excluding Katsipis (FP = 0)
+metadta tp fp fn tn if study != "Katsipis", studyid(study) sumtable(all)
+
+* 2. Excluding Zalewska (Stimulated saliva)
+metadta tp fp fn tn if study != "Zalewska", studyid(study) sumtable(all)
+
+* 3. Excluding Eldem (Non-NIA-AA criteria)
+metadta tp fp fn tn if study != "Eldem", studyid(study) sumtable(all)
+
+* ------------------------------------------------------------------------------
+* STEP 4: SUBGROUP ANALYSES (Table 3 & Figures S7-S12)
+* ------------------------------------------------------------------------------
+* 1. ELISA subgroup (Gleerup, Katsipis, Zalewska, McNicholas, Sabaei)
+metadta tp fp fn tn if method == "ELISA", studyid(study) sumtable(all)
+
+* 2. Unstimulated saliva subgroup (Excluding Zalewska)
+metadta tp fp fn tn if saliva_type == "Unstimulated", studyid(study) sumtable(all)
+
+* 3. NIA-AA criteria subgroup (Gleerup, Katsipis, McNicholas, Sabaei)
+metadta tp fp fn tn if niaa == 1, studyid(study) sumtable(all)
+
+* ------------------------------------------------------------------------------
+* STEP 5: META-REGRESSION (Table 4 & Figures S13-S16)
+* ------------------------------------------------------------------------------
+midas metareg tp fp fn tn, id(study) covariates(fasting)
+midas metareg tp fp fn tn, id(study) covariates(year)
+midas metareg tp fp fn tn, id(study) covariates(mean_age_case) 
+midas metareg tp fp fn tn, id(study) covariates(mean_age_control)
+midas metareg tp fp fn tn, id(study) covariates(niaa)
+midas metareg tp fp fn tn, id(study) covariates(ad_core)
+midas metareg tp fp fn tn, id(study) covariates(immune)
+
+* ------------------------------------------------------------------------------
+* STEP 6: PUBLICATION BIAS (Figure S17)
+* ------------------------------------------------------------------------------
+midas mle tp fp fn tn, id(study)
+midas pubbias, wgt regline
+
+* ------------------------------------------------------------------------------
+* STEP 7: CLINICAL UTILITY / DCA (Figures S18 & S19)
+* ------------------------------------------------------------------------------
+* Prevalence 40% (Memory clinic setting)
+midas hsruc, prevalence(0.40) allmetrics prediction
+
+* Prevalence 4% (Community setting)
+midas hsruc, prevalence(0.04) allmetrics prediction
+
+* ------------------------------------------------------------------------------
+* STEP 8: CALCULATING AUC (For Normalized Group)
+* ------------------------------------------------------------------------------
+* To obtain AUC = 0.83 as reported in the manuscript:
+midas jsroc, scurve cregion pregion data mean Ignd area
+
+* ==============================================================================
+* END OF SCRIPT
+* ==============================================================================
